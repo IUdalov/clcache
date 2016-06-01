@@ -206,7 +206,7 @@ class ObjectCache:
         (preprocessedSourceCode, pperr) = preprocessor.communicate()
 
         if preprocessor.returncode != 0:
-            sys.stderr.write(pperr)
+            sys.stderr.write(decodeBytes(pperr))
             sys.stderr.write("clcache: preprocessor failed\n")
             sys.exit(preprocessor.returncode)
 
@@ -606,6 +606,25 @@ def splitCommandsFile(line):
     return result
 
 
+def decodeBytes(bytes):
+    encoding = "utf-8"
+
+    encodingByBOM = {
+        codecs.BOM_UTF32_BE: 'utf-32-be',
+        codecs.BOM_UTF32_LE: 'utf-32-le',
+        codecs.BOM_UTF16_BE: 'utf-16-be',
+        codecs.BOM_UTF16_LE: 'utf-16-le',
+    }
+
+    for bom, enc in list(encodingByBOM.items()):
+        if bytes.startswith(bom):
+            encoding = encodingByBOM[bom]
+            bytes = bytes[len(bom):]
+            break
+
+    return bytes.decode(encoding)
+
+
 def expandCommandLine(cmdline):
     ret = []
 
@@ -615,25 +634,7 @@ def expandCommandLine(cmdline):
             with open(includeFile, 'rb') as f:
                 rawBytes = f.read()
 
-            encoding = None
-
-            encodingByBOM = {
-                codecs.BOM_UTF32_BE: 'utf-32-be',
-                codecs.BOM_UTF32_LE: 'utf-32-le',
-                codecs.BOM_UTF16_BE: 'utf-16-be',
-                codecs.BOM_UTF16_LE: 'utf-16-le',
-            }
-
-            for bom, enc in list(encodingByBOM.items()):
-                if rawBytes.startswith(bom):
-                    encoding = encodingByBOM[bom]
-                    rawBytes = rawBytes[len(bom):]
-                    break
-
-            if encoding:
-                includeFileContents = rawBytes.decode(encoding)
-            else:
-                includeFileContents = rawBytes.decode("UTF-8")
+            includeFileContents = decodeBytes(rawBytes)
 
             ret.extend(expandCommandLine(splitCommandsFile(includeFileContents.strip())))
         else:
